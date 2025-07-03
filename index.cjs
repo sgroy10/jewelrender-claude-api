@@ -61,9 +61,9 @@ Return ONLY a JSON object in this exact format:
 // Analyze jewelry image endpoint
 app.post('/api/analyze-jewelry', async (req, res) => {
   try {
-    const { imageUrl, imageName, userId } = req.body;
+    const { imageUrl, imageName, userId, base64Image } = req.body;
 
-    if (!imageUrl || !userId) {
+    if (!userId || (!imageUrl && !base64Image)) {
       return res.status(400).json({ 
         success: false, 
         error: 'Missing required fields' 
@@ -71,25 +71,31 @@ app.post('/api/analyze-jewelry', async (req, res) => {
     }
 
     console.log(`Analyzing ${imageName} for user ${userId}`);
-    console.log(`Image URL: ${imageUrl}`);
 
-    // First, fetch the image from Firebase and convert to base64
-    let base64Image;
-    try {
-      const imageResponse = await fetch(imageUrl);
-      if (!imageResponse.ok) {
-        throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+    let imageData;
+    
+    // If base64 is provided directly, use it
+    if (base64Image) {
+      imageData = base64Image;
+      console.log('Using provided base64 image');
+    } else {
+      // Otherwise try to fetch from URL (fallback)
+      try {
+        const imageResponse = await fetch(imageUrl);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+        }
+        const arrayBuffer = await imageResponse.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        imageData = buffer.toString('base64');
+        console.log('Fetched and converted image to base64');
+      } catch (fetchError) {
+        console.error('Error fetching image:', fetchError);
+        return res.status(400).json({
+          success: false,
+          error: 'Unable to access image. Please try again.'
+        });
       }
-      const arrayBuffer = await imageResponse.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      base64Image = buffer.toString('base64');
-      console.log('Successfully fetched and converted image to base64');
-    } catch (fetchError) {
-      console.error('Error fetching image from Firebase:', fetchError);
-      return res.status(400).json({
-        success: false,
-        error: 'Unable to fetch image from Firebase. Please ensure the image URL is publicly accessible.'
-      });
     }
 
     // Call Claude API with base64 image
@@ -115,7 +121,7 @@ app.post('/api/analyze-jewelry', async (req, res) => {
               source: {
                 type: 'base64',
                 media_type: 'image/jpeg',
-                data: base64Image
+                data: imageData
               }
             }
           ]
