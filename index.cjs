@@ -71,8 +71,27 @@ app.post('/api/analyze-jewelry', async (req, res) => {
     }
 
     console.log(`Analyzing ${imageName} for user ${userId}`);
+    console.log(`Image URL: ${imageUrl}`);
 
-    // Call Claude API
+    // First, fetch the image from Firebase and convert to base64
+    let base64Image;
+    try {
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+      }
+      const imageBuffer = await imageResponse.buffer();
+      base64Image = imageBuffer.toString('base64');
+      console.log('Successfully fetched and converted image to base64');
+    } catch (fetchError) {
+      console.error('Error fetching image from Firebase:', fetchError);
+      return res.status(400).json({
+        success: false,
+        error: 'Unable to fetch image from Firebase. Please ensure the image URL is publicly accessible.'
+      });
+    }
+
+    // Call Claude API with base64 image
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -93,8 +112,9 @@ app.post('/api/analyze-jewelry', async (req, res) => {
             {
               type: 'image',
               source: {
-                type: 'url',
-                url: imageUrl
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: base64Image
               }
             }
           ]
