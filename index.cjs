@@ -80,8 +80,9 @@ app.post('/api/analyze-jewelry', async (req, res) => {
       if (!imageResponse.ok) {
         throw new Error(`Failed to fetch image: ${imageResponse.status}`);
       }
-      const imageBuffer = await imageResponse.buffer();
-      base64Image = imageBuffer.toString('base64');
+      const arrayBuffer = await imageResponse.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      base64Image = buffer.toString('base64');
       console.log('Successfully fetched and converted image to base64');
     } catch (fetchError) {
       console.error('Error fetching image from Firebase:', fetchError);
